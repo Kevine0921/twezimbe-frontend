@@ -20,6 +20,25 @@ export const getAllBfs = async () => {
     }
 }
 
+
+export const getGroupBf = async (groupId: string) => {
+    try {
+        const token = Cookies.get("access-token")
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/bf/${groupId}`, {
+            method: "GET",
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+        })
+        const data = await res.json()
+        if (!data.status) return toast.error(data.errors || data.message)
+        return data.bf  
+    } catch (error) {
+        console.log("error fetching bfs", error)
+        toast.error("something went wrong. please refresh the page")
+    }
+}
+
 export const updateUserRole = async (userId: string, new_role: string, bf_id: string) => {
     const token = Cookies.get("access-token")
     try {

@@ -9,6 +9,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { generateProfileID } from "@/utils/generateID";
 import { countryCodes } from "@/constants";
 import { useGetProfileData } from "@/api/auth";
+import { useQuery } from "react-query";
+import { getGroupBf } from "@/lib/bf";
+import MainLoader from "@/components/MainLoader";
 
 type Props = {};
 
@@ -26,7 +29,7 @@ interface FormData {
   mobileNumber?: string;
 }
 
-function BereavementFundPage({}: Props) {
+function SettingInfo({}: Props) {
   const { selectedGroup: group } = useContext(GroupContext);
   const router = useRouter();
   const wallet = useRef("");
@@ -65,25 +68,33 @@ function BereavementFundPage({}: Props) {
   // Watch the countryCode field
   const countryCode = watch("countryCode");
 
-  if (group?.has_bf) return (window.location.href = `/groups/${group._id}`);
 
-  const onSubmit = async (data: FormData) => {
+
+  const { data , isLoading: isLoadingData} = useQuery({
+    queryFn: () => getGroupBf(group?._id || ""),
+    queryKey: [`${group?._id} - group-bf`],
+    enabled: !!group?._id,
+  });
+
+  console.log(data, "group-data");
+
+  const onSubmit = async (values: FormData) => {
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/bf`,
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/bf/${data?.fund?._id}`,
         {
-          method: "POST",
+          method: "PUT",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${Cookies.get("access-token")}`,
           },
-          body: JSON.stringify({ ...data, groupId: group?._id }),
+          body: JSON.stringify({ ...values, groupId: group?._id }),
         }
       );
       const results = await res.json();
       if (!results.status)
         throw new Error(results.error || results.errors || results.message);
-      toast.success("Fund created successfully. redirecting ...");
+      toast.success("Fund Edited successfully. redirecting ...");
       if (searchParams.get("admin") === "true") {
         router.push(`/manager_pages/bfs`);
       } else {
@@ -108,10 +119,30 @@ function BereavementFundPage({}: Props) {
     }
   };
 
+
+  useEffect(() => {
+    if (data?.fund) {
+      setValue("fundName", group?.group_name || "");
+      setValue("fundDetails", data?.fund?.fundDetails);
+      setValue("accountType", data?.fund?.accountType || "bank");
+      setValue("bankName", data?.fund?.bankName || "");
+      setValue("bankAccountNumber", data?.fund?.bankAccountNumber || "");
+      setValue("accountName", data?.fund?.accountName || "");
+      setValue("accountCurrency", data?.fund?.accountCurrency || "");
+      setValue("accountInfo", data?.fund?.accountInfo || "");
+      setValue("walletAddress", wallet.current);
+      setValue("countryCode", data?.fund?.countryCode || "");
+      setValue("mobileNumber", data?.fund?.mobileNumber || "");
+    }
+  }, [data]);
+
+
+  if (isLoadingData) return <MainLoader />;
+
   return (
-    <div className="bg-white min-h-screen flex flex-col items-center py-10 px-6 overflow-auto">
-      <h1 className="text-3xl md:text-4xl font-bold text-blue-800 mb-6 text-center">
-        Create a Bereavement Fund for {group?.group_name}
+    <div className=" min-h-screen flex flex-col text-black items-center py-10 px-6 overflow-auto">
+      <h1 className="text-3xl text-white md:text-4xl font-bold mb-6 text-center">
+        Edit Bereavement Fund for {group?.group_name}
       </h1>
       <form
         onSubmit={handleSubmit(onSubmit)}
@@ -359,7 +390,7 @@ function BereavementFundPage({}: Props) {
               type="submit"
               className="w-full bg-orange-500 text-white font-semibold py-3 rounded-md hover:bg-orange-600 transition duration-200"
             >
-              Create Fund
+              Save
             </button>
           )}
         </div>
@@ -368,4 +399,4 @@ function BereavementFundPage({}: Props) {
   );
 }
 
-export default BereavementFundPage;
+export default SettingInfo;

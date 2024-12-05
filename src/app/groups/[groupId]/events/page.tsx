@@ -27,17 +27,27 @@ import { Textarea } from "@/components/ui/textarea";
 import { useParams } from "next/navigation";
 import Cookies from "js-cookie";
 import { useGetProfileData } from "@/api/auth";
+import { toast } from "sonner";
 
 const DragAndDropCalendar = withDragAndDrop(Calendar);
 
 const localizer = momentLocalizer(moment);
+
+type Event = {
+  id: any;
+  title: string;
+  start: Date;
+  end: Date;
+  allDay: boolean;
+};
 
 const Events = () => {
   const calendarRef = useRef<Calendar<object, object> | undefined>(undefined);
   const groupId = useParams()?.groupId;
   const { currentUser } = useGetProfileData();
   const [isOpen, setIsOpen] = useState(false);
-  const [events, setEvents] = useState([]);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [creating, setCreating] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     date: "",
@@ -58,8 +68,10 @@ const Events = () => {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
+    if (creating) return;
     e.preventDefault();
     try {
+      setCreating(true);
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/group-event/${groupId}`,
         {
@@ -87,8 +99,8 @@ const Events = () => {
           end: new Date(formData.date),
           allDay: false,
         };
-        setEvents([...events, newEvent]);
-
+        setEvents((prevEvents) => [...prevEvents, newEvent]);
+        toast.success("Event created successfully!");
         // Reset form after submission
         setFormData({
           title: "",
@@ -99,9 +111,13 @@ const Events = () => {
         setIsOpen(false);
       } else {
         console.error("Error creating event:", data.errors);
+        toast.error(data.errors || "Failed to create event.");
       }
     } catch (error) {
       console.error("Error submitting form:", error);
+      toast.error("An unexpected error occurred. Please try again.");
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -119,13 +135,15 @@ const Events = () => {
 
         const data = await res.json();
         if (data.status) {
-          const fetchedEvents = data.events.map((event) => ({
-            id: event._id,
-            title: event.title,
-            start: new Date(event.date),
-            end: new Date(event.date),
-            allDay: false,
-          }));
+          const fetchedEvents = data.events.map(
+            (event: { _id: string; title: string; date: string }) => ({
+              id: event._id,
+              title: event.title,
+              start: new Date(event.date),
+              end: new Date(event.date),
+              allDay: false,
+            })
+          );
           setEvents(fetchedEvents);
         }
       } catch (error) {
@@ -150,7 +168,7 @@ const Events = () => {
             Add Event
           </Button>
         </DialogTrigger>
-        <DialogContent>
+        <DialogContent className=" bg-white ">
           <DialogHeader>
             <DialogTitle>Create a New Event</DialogTitle>
             <DialogDescription>
@@ -173,7 +191,12 @@ const Events = () => {
                 onChange={handleChange}
               />
               {/* Dropdown for Event Type */}
-              <Select id="type" value={formData.type} onChange={handleChange}>
+              <Select
+                value={formData.type}
+                onValueChange={(value) =>
+                  setFormData((prev) => ({ ...prev, type: value }))
+                }
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select Event Type" />
                 </SelectTrigger>
@@ -186,6 +209,7 @@ const Events = () => {
                   </SelectGroup>
                 </SelectContent>
               </Select>
+
               <Textarea
                 id="description"
                 placeholder="Event Description"
@@ -196,9 +220,10 @@ const Events = () => {
               />
               <Button
                 type="submit"
+                disabled={creating}
                 className="bg-blue-500 mt-10 text-white w-full"
               >
-                Create Event
+                {creating ? "loading..." : " Create Event"}
               </Button>
             </div>
           </form>
@@ -206,14 +231,13 @@ const Events = () => {
       </Dialog>
 
       {/* Calendar */}
-      <div className="mt-4">
+      <div className="mt-4 w-full">
         <DragAndDropCalendar
-          ref={calendarRef}
           events={events}
           localizer={localizer}
           step={30}
           drilldownView="week"
-          style={{ height: "68vh" }}
+          style={{ flex: 1, height: "80vh", width: "100%" }}
           selectable
           resizable
           longPressThreshold={1}

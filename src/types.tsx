@@ -284,6 +284,7 @@ export type GroupTypes = {
     group_state: string;
     upgraded: boolean;
     tags: string;
+    membership?: boolean;
     suspended?: boolean
 };
 
@@ -308,6 +309,7 @@ export type UpdateGroupTypes = {
     upgraded?: boolean;
     group_id: string;
     isSacco?: boolean;
+    membership?:boolean
 };
 
 export type JoinedGroupTypes = {
